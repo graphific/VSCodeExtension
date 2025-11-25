@@ -204,8 +204,10 @@ export class NodeView {
     }
 
     public set preview(newPreview: string) {
-        const title = this.element.querySelector(".preview") as HTMLElement;
-        title.innerText = newPreview;
+        const previewElement = this.element.querySelector(
+            ".preview",
+        ) as HTMLElement;
+        previewElement.innerHTML = newPreview;
     }
 
     public set position(position: Position) {

@@ -93,7 +93,8 @@ div.node {
     user-select: none;
 
     width: 200px;
-    height: 125px;
+    min-height: 125px;
+    height: auto;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
@@ -153,18 +154,23 @@ div.node.color .node-buttons {
 div.node.color-red .color-bar {
     background-color: var(--vscode-charts-red);
 }
+
 div.node.color-blue .color-bar {
     background-color: var(--vscode-charts-blue);
 }
+
 div.node.color-yellow .color-bar {
     background-color: var(--vscode-charts-yellow);
 }
+
 div.node.color-orange .color-bar {
     background-color: var(--vscode-charts-orange);
 }
+
 div.node.color-green .color-bar {
     background-color: var(--vscode-charts-green);
 }
+
 div.node.color-purple .color-bar {
     background-color: var(--vscode-charts-purple);
 }
@@ -176,6 +182,7 @@ div.node.note.color-red {
         var(--vscode-editor-background) 50%
     );
 }
+
 div.node.note.color-yellow {
     --note-background: color-mix(
         in srgb,
@@ -183,6 +190,7 @@ div.node.note.color-yellow {
         var(--vscode-editor-background) 50%
     );
 }
+
 div.node.note.color-orange {
     --note-background: color-mix(
         in srgb,
@@ -190,6 +198,7 @@ div.node.note.color-orange {
         var(--vscode-editor-background) 50%
     );
 }
+
 div.node.note.color-purple {
     --note-background: color-mix(
         in srgb,
@@ -197,6 +206,7 @@ div.node.note.color-purple {
         var(--vscode-editor-background) 50%
     );
 }
+
 div.node.note.color-blue {
     --note-background: color-mix(
         in srgb,
@@ -204,6 +214,7 @@ div.node.note.color-blue {
         var(--vscode-editor-background) 50%
     );
 }
+
 div.node.note.color-green {
     --note-background: color-mix(
         in srgb,
@@ -235,16 +246,71 @@ div.node.has-subtitle .subtitle {
 div.node.note .title {
     display: none;
 }
+
 div.node.note .subtitle {
     display: none;
 }
+
 div.node .preview {
-    font-size: 0.75em;
+    font-size: var(--node-preview-font-size, 12px);
     opacity: 0.5;
+    white-space: pre-wrap;
 }
+
 div.node.note .preview {
     opacity: 1;
     font-size: 0.9em;
+}
+
+.choice-line {
+    display: block;
+    text-decoration: underline;
+    font-weight: 600;
+    margin: 2px 0;
+}
+
+.speaker-label {
+    font-weight: 600;
+    margin-right: 4px;
+    display: inline-block;
+}
+
+.text-effect {
+    font-style: italic;
+}
+
+.text-effect-wave {
+    text-decoration: underline;
+    text-decoration-style: wavy;
+}
+
+.text-effect-bounce {
+    letter-spacing: 0.02em;
+}
+
+.text-effect-shake {
+    text-shadow: 0 0 2px var(--vscode-editor-foreground);
+}
+
+.text-effect-rainbow {
+    background: linear-gradient(
+        90deg,
+        red,
+        orange,
+        yellow,
+        green,
+        blue,
+        indigo,
+        violet
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.text-effect-glitch {
+    text-shadow:
+        -1px 0 var(--vscode-editor-foreground),
+        1px 0 var(--vscode-editor-foreground);
 }
 
 div.node#node-template {

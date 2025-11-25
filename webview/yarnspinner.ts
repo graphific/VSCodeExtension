@@ -172,7 +172,107 @@ const dynamicIconButtons: Array<{
 let hideCommentsInPreview = false;
 let hideCommandsInPreview = false;
 let renderTextEffectsInPreview = true;
+let previewFontSize = 12;
+let explicitSpeakerColors: Record<string, string> = {};
+let autoSpeakerColors: Record<string, string> = {};
+let autoColorEnabled = true;
 let lastNodesEvent: NodesUpdatedEvent | null = null;
+
+function applyPreviewFontSize() {
+    const clamped = Math.min(Math.max(previewFontSize, 8), 24);
+    document.documentElement.style.setProperty(
+        "--node-preview-font-size",
+        `${clamped}px`,
+    );
+}
+
+applyPreviewFontSize();
+applySpeakerColors("");
+
+function applySpeakerColors(raw: string) {
+    explicitSpeakerColors = parseSpeakerColors(raw);
+    autoSpeakerColors = {};
+}
+
+function ensureAutoSpeakerColor(name: string) {
+    const key = name.toLowerCase();
+    if (explicitSpeakerColors[key] || autoSpeakerColors[key]) {
+        return;
+    }
+    if (!autoColorEnabled) {
+        return;
+    }
+    const palette = [
+        "#ff7043",
+        "#29b6f6",
+        "#ab47bc",
+        "#9ccc65",
+        "#ffa726",
+        "#ec407a",
+        "#26a69a",
+        "#7e57c2",
+    ];
+    const index = Math.abs(hashString(key)) % palette.length;
+    autoSpeakerColors[key] = palette[index];
+}
+
+function hashString(value: string): number {
+    let hash = 0;
+    for (let i = 0; i < value.length; i++) {
+        hash = (hash << 5) - hash + value.charCodeAt(i);
+        hash |= 0;
+    }
+    return hash;
+}
+
+function sanitizeColor(value: string): string | null {
+    const cleaned = value.replace(/["']/g, "");
+    if (/^#[0-9a-fA-F]{3,8}$/.test(cleaned)) {
+        return cleaned;
+    }
+    if (/^[a-zA-Z]+$/.test(cleaned)) {
+        return cleaned;
+    }
+    if (
+        /^(rgb|rgba|hsl|hsla)\([0-9.,%\s]+\)$/.test(cleaned.replace(/\s+/g, ""))
+    ) {
+        return cleaned;
+    }
+    return null;
+}
+
+function sanitizeSize(value: string): string | null {
+    const cleaned = value.replace(/["']/g, "");
+    if (/^[0-9]+(\.[0-9]+)?(px|em|rem|%)?$/.test(cleaned)) {
+        return cleaned;
+    }
+    return null;
+}
+
+function parseSpeakerColors(raw: string): Record<string, string> {
+    if (!raw || raw.trim() === "") {
+        return {};
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed !== "object" || parsed === null) {
+            return {};
+        }
+        const entries: Record<string, string> = {};
+        for (const [name, color] of Object.entries(parsed)) {
+            if (typeof color !== "string") {
+                continue;
+            }
+            const sanitized = sanitizeColor(color);
+            if (sanitized) {
+                entries[name.toLowerCase()] = sanitized;
+            }
+        }
+        return entries;
+    } catch {
+        return {};
+    }
+}
 
 function createIconElement(svgContent: string) {
     const element = parser.parseFromString(svgContent, "image/svg+xml")
@@ -278,6 +378,11 @@ viewState.onSelectionChanged = (nodes) => {
             hideCommentsInPreview = event.hideComments;
             hideCommandsInPreview = event.hideCommands;
             renderTextEffectsInPreview = event.renderTextEffects;
+            previewFontSize = event.previewFontSize;
+            applyPreviewFontSize();
+            applySpeakerColors(event.speakerColors);
+            autoColorEnabled = event.autoSpeakerColors;
+            autoSpeakerColors = {};
             if (lastNodesEvent) {
                 nodesUpdated(lastNodesEvent);
             }
@@ -385,53 +490,291 @@ viewState.onSelectionChanged = (nodes) => {
     }
 
     function formatPreviewText(text: string): string {
-        let processedText = renderTextEffectsInPreview
-            ? applyTextEffects(text)
-            : text;
-        let lines = processedText.split(/\r?\n/);
+        let lines = text.split(/\r?\n/);
         if (hideCommentsInPreview) {
             lines = lines.filter(
                 (line) => line.trim().startsWith("//") === false,
             );
         }
+
+        lines = lines.filter((line) => line.trim() !== "===");
+
         if (hideCommandsInPreview) {
-            lines = lines
-                .map((line) =>
-                    line
-                        .replace(/\[[^\]]+\]/g, "")
-                        .replace(/<<[^>]+>>/g, "")
-                        .replace(/\s+/g, " ")
-                        .trim(),
-                )
-                .filter((line) => line.length > 0);
+            lines = lines.map((line) =>
+                stripBracketCommands(line).replace(/<<[^>]+>>/g, ""),
+            );
         }
-        return lines.join("\n");
+
+        if (lines.length === 0) {
+            return "";
+        }
+
+        const formattedLines = lines.map((line) => {
+            const trimmedStart = line.trimStart();
+            if (trimmedStart.startsWith("->")) {
+                const choiceText = trimmedStart.slice(2).trim();
+                const renderedChoice = renderLineContent(choiceText);
+                const choiceBody = renderedChoice || "&nbsp;";
+                return `<span class="choice-line">${choiceBody}</span>`;
+            }
+
+            const rendered = renderDialogueLine(line);
+            return rendered === "" ? "&nbsp;" : rendered;
+        });
+
+        const rendered = formattedLines.join("<br />");
+        return collapseChoiceSpacing(rendered);
     }
 
-    const textEffectDecorators: Record<
-        string,
-        { prefix: string; suffix: string }
-    > = {
-        wave: { prefix: "~", suffix: "~" },
-        bounce: { prefix: "^", suffix: "^" },
-        shake: { prefix: "!", suffix: "!" },
-        rainbow: { prefix: "*", suffix: "*" },
-        glitch: { prefix: "#", suffix: "#" },
-        bold: { prefix: "**", suffix: "**" },
-        italic: { prefix: "_", suffix: "_" },
-        underline: { prefix: "__", suffix: "__" },
-        color: { prefix: "", suffix: "" },
+    function renderLineContent(line: string): string {
+        return convertMarkupToHtml(line);
+    }
+
+    function renderDialogueLine(line: string): string {
+        const leading = line.match(/^\s*/)?.[0] ?? "";
+        const rest = line.slice(leading.length);
+        const speakerMatch = rest.match(/^([^:]+):\s*/);
+
+        const leadingHtml = convertWhitespace(leading);
+
+        if (speakerMatch) {
+            const speakerName = speakerMatch[1].trim();
+            const remainder = rest.slice(speakerMatch[0].length);
+            const label = renderSpeakerLabel(speakerName);
+            const remainderHtml = renderLineContent(remainder);
+            const spacer = remainderHtml.length > 0 ? "&nbsp;" : "";
+            return `${leadingHtml}${label}${
+                remainderHtml ? `${spacer}${remainderHtml}` : ""
+            }`;
+        }
+
+        const contentHtml = renderLineContent(rest);
+        return `${leadingHtml}${contentHtml}`;
+    }
+
+    function escapeHtml(input: string): string {
+        return input
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    type TagRenderer = {
+        open: (rawArgs: string) => string | null;
+        close: string;
     };
 
-    function applyTextEffects(input: string): string {
-        const regex = /\[(\w+)[^\]]*\]([\s\S]*?)\[\/\1\]/g;
-        return input.replace(regex, (_, tag: string, content: string) => {
-            const formattedInner = applyTextEffects(content);
-            const decorator = textEffectDecorators[tag.toLowerCase()] ?? {
-                prefix: "",
-                suffix: "",
-            };
-            return `${decorator.prefix}${formattedInner}${decorator.suffix}`;
+    const formattingTagRenderers: Record<string, TagRenderer> = {
+        b: simpleTag("<strong>", "</strong>"),
+        strong: simpleTag("<strong>", "</strong>"),
+        bold: simpleTag("<strong>", "</strong>"),
+        i: simpleTag("<em>", "</em>"),
+        em: simpleTag("<em>", "</em>"),
+        u: simpleTag('<span style="text-decoration:underline;">', "</span>"),
+        underline: simpleTag(
+            '<span style="text-decoration:underline;">',
+            "</span>",
+        ),
+        s: simpleTag('<span style="text-decoration:line-through;">', "</span>"),
+        strike: simpleTag(
+            '<span style="text-decoration:line-through;">',
+            "</span>",
+        ),
+        strikethrough: simpleTag(
+            '<span style="text-decoration:line-through;">',
+            "</span>",
+        ),
+        code: simpleTag("<code>", "</code>"),
+        sup: simpleTag("<sup>", "</sup>"),
+        sub: simpleTag("<sub>", "</sub>"),
+        color: {
+            open: (rawArgs) => {
+                const value = extractAttributeValue(rawArgs);
+                if (!value) {
+                    return null;
+                }
+                const sanitized = sanitizeColor(value);
+                if (!sanitized) {
+                    return null;
+                }
+                return `<span style="color:${sanitized};">`;
+            },
+            close: "</span>",
+        },
+        size: {
+            open: (rawArgs) => {
+                const value = extractAttributeValue(rawArgs);
+                if (!value) {
+                    return null;
+                }
+                const sanitized = sanitizeSize(value);
+                if (!sanitized) {
+                    return null;
+                }
+                return `<span style="font-size:${sanitized};">`;
+            },
+            close: "</span>",
+        },
+    };
+
+    const effectTagRenderers: Record<string, TagRenderer> = {
+        wave: effectTag("wave"),
+        bounce: effectTag("bounce"),
+        shake: effectTag("shake"),
+        rainbow: effectTag("rainbow"),
+        glitch: effectTag("glitch"),
+    };
+
+    const formattingTags = new Set([
+        "b",
+        "bold",
+        "strong",
+        "i",
+        "em",
+        "italic",
+        "u",
+        "underline",
+        "s",
+        "strike",
+        "strikethrough",
+        "code",
+        "sup",
+        "sub",
+        "color",
+        "size",
+    ]);
+
+    function convertMarkupToHtml(line: string): string {
+        const applyFormatting = renderTextEffectsInPreview;
+        const parts: string[] = [];
+        let lastIndex = 0;
+        let match: RegExpExecArray | null;
+        const regex = createTagPattern();
+
+        while ((match = regex.exec(line)) !== null) {
+            if (match.index > lastIndex) {
+                parts.push(escapeHtml(line.slice(lastIndex, match.index)));
+            }
+
+            const tagName = match[2]?.toLowerCase() ?? "";
+            const isClosing = match[1] === "/";
+            const rawArgs = match[3] ?? "";
+            const rendered = renderTag(
+                tagName,
+                isClosing,
+                rawArgs,
+                applyFormatting,
+            );
+
+            if (rendered !== null) {
+                parts.push(rendered);
+            } else {
+                parts.push(escapeHtml(match[0]));
+            }
+
+            lastIndex = match.index + match[0].length;
+        }
+
+        if (lastIndex < line.length) {
+            parts.push(escapeHtml(line.slice(lastIndex)));
+        }
+
+        return parts.join("");
+    }
+
+    function createTagPattern(): RegExp {
+        return /\[(\/?)([a-zA-Z0-9_-]+)([^\]]*)\]/g;
+    }
+
+    function renderTag(
+        tagName: string,
+        isClosing: boolean,
+        rawArgs: string,
+        applyFormatting: boolean,
+    ): string | null {
+        const renderer =
+            formattingTagRenderers[tagName] ?? effectTagRenderers[tagName];
+
+        if (!renderer) {
+            return null;
+        }
+
+        if (isClosing) {
+            return renderer.close;
+        }
+
+        return applyFormatting ? renderer.open(rawArgs) : null;
+    }
+
+    function simpleTag(open: string, close: string): TagRenderer {
+        return {
+            open: () => open,
+            close,
+        };
+    }
+
+    function effectTag(name: string): TagRenderer {
+        return {
+            open: () => `<span class="text-effect text-effect-${name}">`,
+            close: "</span>",
+        };
+    }
+
+    function extractAttributeValue(rawArgs: string): string | null {
+        if (!rawArgs) {
+            return null;
+        }
+        const trimmed = rawArgs.trim();
+        if (!trimmed) {
+            return null;
+        }
+        const equalsIndex = trimmed.indexOf("=");
+        if (equalsIndex >= 0) {
+            return trimmed.slice(equalsIndex + 1).trim();
+        }
+        return trimmed;
+    }
+
+    function stripBracketCommands(line: string): string {
+        const regex = createTagPattern();
+        return line.replace(regex, (match, slash, name) => {
+            const tag = (name as string).toLowerCase();
+            if (formattingTags.has(tag)) {
+                return match;
+            }
+            return "";
         });
+    }
+
+    function convertWhitespace(input: string): string {
+        return input
+            .replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;")
+            .replace(/ /g, "&nbsp;");
+    }
+
+    function renderSpeakerLabel(name: string): string {
+        const key = name.toLowerCase();
+        ensureAutoSpeakerColor(name);
+        const color =
+            explicitSpeakerColors[key] ??
+            explicitSpeakerColors["*"] ??
+            autoSpeakerColors[key] ??
+            "";
+        const style = color ? ` style="color:${escapeAttribute(color)};"` : "";
+        return `<span class="speaker-label"${style}>${escapeHtml(name)}:</span>`;
+    }
+
+    function collapseChoiceSpacing(html: string): string {
+        return html.replace(/<\/span><br \/>&nbsp;<br \/>/g, "</span><br />");
+    }
+
+    function escapeAttribute(value: string): string {
+        return value
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
     }
 })();

@@ -315,6 +315,23 @@
                     "default": true,
                     "description": "Render Yarn text effects (e.g. [wave], [bounce]) in graph node previews"
                 },
+                "yarnspinner.graph.previewFontSize": {
+                    "type": "number",
+                    "default": 12,
+                    "minimum": 8,
+                    "maximum": 24,
+                    "description": "Font size (in px) used for node previews in the legacy graph view"
+                },
+                "yarnspinner.graph.speakerColors": {
+                    "type": "string",
+                    "default": "",
+                    "description": "JSON object mapping speaker names to CSS colors (e.g. {\"Narrator\":\"#888888\",\"Maya\":\"#c2185b\"}). Leave blank to auto-assign colours."
+                },
+                "yarnspinner.graph.autoSpeakerColors": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When true and speakerColors is empty, automatically assign consistent colours per speaker"
+                },
                 "yarnspinner.enableExperimentalFeatures": {
                     "type": "boolean",
                     "default": false,

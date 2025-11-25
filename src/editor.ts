@@ -34,6 +34,9 @@ export interface PreviewOptionsEvent {
     hideComments: boolean;
     hideCommands: boolean;
     renderTextEffects: boolean;
+    previewFontSize: number;
+    speakerColors: string;
+    autoSpeakerColors: boolean;
 }
 
 export type WebViewEvent =
@@ -92,11 +95,20 @@ export class YarnSpinnerEditorProvider
                 configs.get<boolean>("graph.hideCommands") ?? false;
             const renderTextEffects =
                 configs.get<boolean>("graph.renderTextEffects") ?? true;
+            const previewFontSize =
+                configs.get<number>("graph.previewFontSize") ?? 12;
+            const speakerColors =
+                configs.get<string>("graph.speakerColors") ?? "";
+            const autoSpeakerColors =
+                configs.get<boolean>("graph.autoSpeakerColors") ?? true;
             postWebviewMessage({
                 type: "set-preview-options",
                 hideComments,
                 hideCommands,
                 renderTextEffects,
+                previewFontSize,
+                speakerColors,
+                autoSpeakerColors,
             });
         };
 
@@ -121,6 +133,9 @@ export class YarnSpinnerEditorProvider
                     "yarnspinner.graph.hideComments",
                     "yarnspinner.graph.hideCommands",
                     "yarnspinner.graph.renderTextEffects",
+                    "yarnspinner.graph.previewFontSize",
+                    "yarnspinner.graph.speakerColors",
+                    "yarnspinner.graph.autoSpeakerColors",
                 ];
                 if (
                     watchedSettings.some((setting) =>
