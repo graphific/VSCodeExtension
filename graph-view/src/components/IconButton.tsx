@@ -7,18 +7,23 @@ export function IconButton(props: {
     onClick?: React.MouseEventHandler;
     title?: string;
 }) {
+    const IconComponent = props.icon;
+    const isEnabled = props.enabled === true || props.enabled === undefined;
     return (
         <div
-            onClick={props.onClick}
+            onClick={isEnabled ? props.onClick : undefined}
             title={props.title}
-            className={clsx("h-[20px] flex", {
-                "fill-editor-foreground/75 hover:fill-editor-foreground cursor-pointer":
-                    props.enabled === true || props.enabled === undefined,
-                "fill-editor-foreground/25 cursor-auto":
-                    props.enabled === false,
-            })}
+            className={clsx(
+                "h-[28px] w-[28px] flex items-center justify-center flex-shrink-0 rounded-sm border border-editor-foreground/20 bg-editor-background shadow-sm transition-colors",
+                {
+                    "fill-editor-foreground hover:fill-editor-foreground/80 cursor-pointer":
+                        isEnabled,
+                    "fill-editor-foreground/40 opacity-70 cursor-not-allowed":
+                        !isEnabled,
+                },
+            )}
         >
-            <props.icon />
+            <IconComponent />
         </div>
     );
 }

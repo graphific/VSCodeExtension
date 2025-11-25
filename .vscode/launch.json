@@ -6,21 +6,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Test",
-            "request": "launch",
-            "runtimeArgs": ["test"],
-            "runtimeExecutable": "npm",
-            "skipFiles": ["<node_internals>/**"],
-            "type": "node"
-        },
-        {
             "name": "Extension",
             "type": "extensionHost",
             "preLaunchTask": "build-extension-development",
             "request": "launch",
             "runtimeExecutable": "${execPath}",
             "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
-            "envFile": "${workspaceFolder}/.env",
             "skipFiles": ["${workspaceFolder}/node_modules/**/*.js"]
         },
         {
@@ -77,6 +68,14 @@
             "request": "attach",
             "requireExactSource": false
             // "processName": "dotnet YarnLanguageServer.dll --waitForDebugger"
+        },
+        {
+            "name": "Test",
+            "request": "launch",
+            "runtimeArgs": ["test"],
+            "runtimeExecutable": "npm",
+            "skipFiles": ["<node_internals>/**"],
+            "type": "node"
         }
     ]
 }

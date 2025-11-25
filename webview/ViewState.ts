@@ -48,6 +48,10 @@ export class ViewState {
     /** The transform matrix used for translating and scaling the node view. */
     private matrix: DOMMatrix = new DOMMatrix();
 
+    private zoomContainer: HTMLElement;
+
+    private interactionEnabled = true;
+
     /** The number of nodes that have been created since the last time the
      * viewport was moved. */
     private nodesSinceLastMove = 0;
@@ -112,6 +116,7 @@ export class ViewState {
     }
 
     constructor(zoomContainer: HTMLElement, nodesContainer: HTMLElement) {
+        this.zoomContainer = zoomContainer;
         if (ViewState.DEBUG) {
             // The center debug element is kept in the middle of the window, but
             // positioned in view-space
@@ -181,6 +186,9 @@ export class ViewState {
         let dragStartPosition: Position = { x: 0, y: 0 };
 
         const dragBegin = (e: MouseEvent) => {
+            if (!this.interactionEnabled) {
+                return;
+            }
             // Only take action if this is a select.
             if (getGestureType(e) != MouseGestureType.Select) {
                 return;
@@ -211,6 +219,9 @@ export class ViewState {
         };
 
         const dragMove = (e: MouseEvent) => {
+            if (!this.interactionEnabled) {
+                return;
+            }
             const currentPosition = { x: e.clientX, y: e.clientY };
 
             const topLeft = {
@@ -293,6 +304,9 @@ export class ViewState {
         // When we start dragging the background, start tracking mouseup,
         // mousemove, and mouseleave to apply the drag gesture.
         const onBackgroundDragStart = (e: MouseEvent) => {
+            if (!this.interactionEnabled) {
+                return;
+            }
             // Only take action if this is a pan.
             if (getGestureType(e) != MouseGestureType.Pan) {
                 return;
@@ -311,6 +325,9 @@ export class ViewState {
         // When the mouse moves during a drag, calculate how much the cursor has
         // moved in view-space, and apply that translation.
         const onBackgroundDragMove = (e: MouseEvent) => {
+            if (!this.interactionEnabled) {
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
 
@@ -349,6 +366,9 @@ export class ViewState {
 
     private setupZoom(zoomContainer: HTMLElement) {
         zoomContainer.addEventListener("wheel", (e) => {
+            if (!this.interactionEnabled) {
+                return;
+            }
             const delta = e.deltaY / constants.zoomSpeed;
             let nextScale = 1 - delta * constants.factor;
 
@@ -652,6 +672,9 @@ export class ViewState {
                 this.onNodeDelete(n.nodeName);
 
             newNodeView.onNodeDragStart = (nodeView) => {
+                if (!this.interactionEnabled) {
+                    return;
+                }
                 if (this.selectedNodeViews.has(nodeView) == false) {
                     // We started dragging a node view that wasn't selected.
                     // Clear the selection state and replace it with just this
@@ -691,6 +714,9 @@ export class ViewState {
                 startPosition,
                 currentPosition,
             ) => {
+                if (!this.interactionEnabled) {
+                    return;
+                }
                 const startViewSpace = this.convertToViewSpace(startPosition);
                 const currentViewSpace =
                     this.convertToViewSpace(currentPosition);
@@ -716,6 +742,9 @@ export class ViewState {
             };
 
             newNodeView.onNodeDragEnd = (nodeView) => {
+                if (!this.interactionEnabled) {
+                    return;
+                }
                 var positions: Record<string, Position> = {};
 
                 this.selectedNodeViews.forEach((v) => {
@@ -800,6 +829,137 @@ export class ViewState {
         return Array.from(this.selectedNodeViews.values()).map(
             (nv) => nv.nodeName,
         );
+    }
+
+    private applyZoom(scaleFactor: number, focusPoint?: Position) {
+        const point = focusPoint ?? getWindowCenter();
+        const viewPoint = this.convertToViewSpace(point);
+        const { scale } = decomposeTransformMatrix(this.matrix);
+        let target = scale.x * scaleFactor;
+
+        if (target > constants.zoomMaxScale) {
+            scaleFactor = constants.zoomMaxScale / scale.x;
+        } else if (target < constants.zoomMinScale) {
+            scaleFactor = constants.zoomMinScale / scale.x;
+        }
+
+        this.matrix.scaleSelf(
+            scaleFactor,
+            scaleFactor,
+            1,
+            viewPoint.x,
+            viewPoint.y,
+            0,
+        );
+        this.updateView();
+    }
+
+    public zoomIn() {
+        this.applyZoom(1.1, getWindowCenter());
+    }
+
+    public zoomOut() {
+        this.applyZoom(1 / 1.1, getWindowCenter());
+    }
+
+    public zoomToFit() {
+        const nodeViews = Array.from(this.nodeViews.values());
+        if (nodeViews.length === 0) {
+            return;
+        }
+
+        const minX = Math.min(...nodeViews.map((n) => n.left));
+        const maxX = Math.max(...nodeViews.map((n) => n.right));
+        const minY = Math.min(...nodeViews.map((n) => n.top));
+        const maxY = Math.max(...nodeViews.map((n) => n.bottom));
+
+        const width = maxX - minX || 1;
+        const height = maxY - minY || 1;
+
+        const bounds = this.zoomContainer.getBoundingClientRect();
+        const padding = 80;
+        const availableWidth = Math.max(bounds.width - padding, 10);
+        const availableHeight = Math.max(bounds.height - padding, 10);
+
+        const targetScale = Math.min(
+            availableWidth / width,
+            availableHeight / height,
+            constants.zoomMaxScale,
+        );
+        const { scale } = decomposeTransformMatrix(this.matrix);
+        const scaleFactor = targetScale / scale.x;
+
+        this.matrix = new DOMMatrix();
+        const center = {
+            x: minX + width / 2,
+            y: minY + height / 2,
+        };
+
+        this.matrix.scaleSelf(
+            scaleFactor,
+            scaleFactor,
+            1,
+            center.x,
+            center.y,
+            0,
+        );
+
+        const viewCenter = this.convertToViewSpace(getWindowCenter());
+        this.matrix.translateSelf(
+            viewCenter.x - center.x,
+            viewCenter.y - center.y,
+        );
+
+        this.updateView();
+    }
+
+    public autoLayout(direction: "horizontal" | "vertical") {
+        const targets =
+            this.selectedNodeViews.size > 1
+                ? Array.from(this.selectedNodeViews.values())
+                : Array.from(this.nodeViews.values());
+
+        if (targets.length === 0) {
+            return;
+        }
+
+        const baseX = Math.min(...targets.map((n) => n.left));
+        const baseY = Math.min(...targets.map((n) => n.top));
+        const spacingX = constants.NodeSize.width + constants.newNodeOffset * 4;
+        const spacingY =
+            constants.NodeSize.height + constants.newNodeOffset * 4;
+
+        targets.forEach((nodeView, index) => {
+            if (direction === "horizontal") {
+                nodeView.left = baseX + index * spacingX;
+                nodeView.top = baseY;
+            } else {
+                nodeView.left = baseX;
+                nodeView.top = baseY + index * spacingY;
+            }
+        });
+
+        this.refreshLines();
+        this.groupViews.forEach((group) => group.refreshSize());
+        this.emitNodePositions(targets);
+    }
+
+    private emitNodePositions(nodeViews: NodeView[]) {
+        const positions: Record<string, Position> = {};
+        nodeViews.forEach((nv) => {
+            positions[nv.nodeName] = nv.position;
+        });
+        this.onNodesMoved(positions);
+    }
+
+    public setInteractionEnabled(value: boolean) {
+        this.interactionEnabled = value;
+        this.zoomContainer.classList.toggle("interaction-disabled", !value);
+        this.nodesContainer.classList.toggle("interaction-disabled", !value);
+    }
+
+    public get isInteractionEnabled(): boolean {
+        return this.interactionEnabled;
     }
 }
 

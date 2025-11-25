@@ -71,75 +71,151 @@ alignmentButtonContainer.id = "alignment-buttons";
 alignmentButtonContainer.style.zIndex = "9999";
 document.body.appendChild(alignmentButtonContainer);
 
-const alignment: Record<string, { cb: () => void; i: string; t: string }> = {
-    "align-left": {
-        cb: () => viewState.alignSelectedNodes(Alignment.Left),
-        i: require("./images/align-left.svg") as string,
-        t: "Align Left",
-    },
-    // "align-center": {
-    // 	cb: () => viewState.alignSelectedNodes(Alignment.Center),
-    // 	i: require('./images/align-center.svg') as string,
-    // 	t: "Align Center"
-    // },
-    "align-right": {
-        cb: () => viewState.alignSelectedNodes(Alignment.Right),
-        i: require("./images/align-right.svg") as string,
-        t: "Align Right",
-    },
-    "align-top": {
-        cb: () => viewState.alignSelectedNodes(Alignment.Top),
-        i: require("./images/align-top.svg") as string,
-        t: "Align Top",
-    },
-    // "align-middle": {
-    // 	cb: () => viewState.alignSelectedNodes(Alignment.Middle),
-    // 	i: require('./images/align-middle.svg') as string,
-    // 	t: "Align Middle"
-    // },
-    "align-bottom": {
-        cb: () => viewState.alignSelectedNodes(Alignment.Bottom),
-        i: require("./images/align-bottom.svg") as string,
-        t: "Align Bottom",
-    },
+type ButtonConfig = {
+    id: string;
+    title: string;
+    icon: string | (() => string);
+    onClick: () => void;
+    requiresSelection?: boolean;
 };
+
+const buttonConfigs: ButtonConfig[] = [
+    {
+        id: "align-left",
+        title: "Align Left",
+        icon: require("./images/align-left.svg") as string,
+        onClick: () => viewState.alignSelectedNodes(Alignment.Left),
+        requiresSelection: true,
+    },
+    {
+        id: "align-right",
+        title: "Align Right",
+        icon: require("./images/align-right.svg") as string,
+        onClick: () => viewState.alignSelectedNodes(Alignment.Right),
+        requiresSelection: true,
+    },
+    {
+        id: "align-top",
+        title: "Align Top",
+        icon: require("./images/align-top.svg") as string,
+        onClick: () => viewState.alignSelectedNodes(Alignment.Top),
+        requiresSelection: true,
+    },
+    {
+        id: "align-bottom",
+        title: "Align Bottom",
+        icon: require("./images/align-bottom.svg") as string,
+        onClick: () => viewState.alignSelectedNodes(Alignment.Bottom),
+        requiresSelection: true,
+    },
+    {
+        id: "auto-layout-vertical",
+        title: "Auto Layout Vertically",
+        icon: require("./images/auto-layout-vertical.svg") as string,
+        onClick: () => viewState.autoLayout("vertical"),
+    },
+    {
+        id: "auto-layout-horizontal",
+        title: "Auto Layout Horizontally",
+        icon: require("./images/auto-layout-horizontal.svg") as string,
+        onClick: () => viewState.autoLayout("horizontal"),
+    },
+    {
+        id: "zoom-in",
+        title: "Zoom In",
+        icon: require("./images/zoom-in.svg") as string,
+        onClick: () => viewState.zoomIn(),
+    },
+    {
+        id: "zoom-out",
+        title: "Zoom Out",
+        icon: require("./images/zoom-out.svg") as string,
+        onClick: () => viewState.zoomOut(),
+    },
+    {
+        id: "zoom-fit",
+        title: "Zoom to Fit",
+        icon: require("./images/zoom-fit.svg") as string,
+        onClick: () => viewState.zoomToFit(),
+    },
+];
+
+const lockIcons = {
+    locked: require("./images/lock.svg") as string,
+    unlocked: require("./images/unlock.svg") as string,
+};
+
+buttonConfigs.push({
+    id: "toggle-interactive",
+    title: "Toggle Interaction",
+    icon: () =>
+        viewState.isInteractionEnabled ? lockIcons.unlocked : lockIcons.locked,
+    onClick: () => {
+        viewState.setInteractionEnabled(!viewState.isInteractionEnabled);
+        updateDynamicIcons();
+    },
+});
 
 const parser = new DOMParser();
 
-let alignmentButtons: HTMLElement[] = [];
+const selectionButtons: HTMLElement[] = [];
+const dynamicIconButtons: Array<{
+    button: HTMLElement;
+    iconProvider: () => string;
+}> = [];
 
-for (const alignmentEntryName in alignment) {
-    const alignmentEntry = alignment[alignmentEntryName];
+function createIconElement(svgContent: string) {
+    const element = parser.parseFromString(svgContent, "image/svg+xml")
+        .firstElementChild as SVGElement;
+    element.style.width = "16px";
+    element.style.height = "16px";
+    return element;
+}
 
-    const alignmentButton = document.createElement("vscode-button");
-    alignmentButton.id = `button-${alignmentEntryName}`;
-    alignmentButton.setAttribute("appearance", "icon");
-    alignmentButton.addEventListener("click", alignmentEntry.cb);
-    alignmentButton.title = alignmentEntry.t;
-    alignmentButton.ariaLabel = alignmentEntry.t;
+function updateDynamicIcons() {
+    for (const dynamicButton of dynamicIconButtons) {
+        const newIcon = createIconElement(dynamicButton.iconProvider());
+        dynamicButton.button.replaceChildren(newIcon);
+    }
+}
 
-    const alignmentImage = parser.parseFromString(
-        alignmentEntry.i,
-        "image/svg+xml",
-    ).firstElementChild as SVGElement;
-    alignmentImage.style.width = "16px";
-    alignmentImage.style.height = "16px";
+for (const config of buttonConfigs) {
+    const button = document.createElement("vscode-button");
+    button.id = `button-${config.id}`;
+    button.setAttribute("appearance", "icon");
+    button.title = config.title;
+    button.ariaLabel = config.title;
+    button.addEventListener("click", () => config.onClick());
 
-    alignmentButton.appendChild(alignmentImage);
-    alignmentButtonContainer.appendChild(alignmentButton);
+    const iconString =
+        typeof config.icon === "function" ? config.icon() : config.icon;
+    const iconElement = createIconElement(iconString);
+    button.appendChild(iconElement);
+    alignmentButtonContainer.appendChild(button);
 
-    alignmentButtons.push(alignmentButton);
+    if (typeof config.icon === "function") {
+        dynamicIconButtons.push({
+            button,
+            iconProvider: config.icon,
+        });
+    }
+
+    if (config.requiresSelection) {
+        button.classList.add("disabled");
+        button.setAttribute("disabled", "");
+        selectionButtons.push(button);
+    }
 }
 
 viewState.onSelectionChanged = (nodes) => {
     if (nodes.length <= 1) {
         // We can only align nodes if we have more than 1 selected.
-        alignmentButtons.forEach((b) => {
+        selectionButtons.forEach((b) => {
             b.classList.add("disabled");
             b.setAttribute("disabled", "");
         });
     } else {
-        alignmentButtons.forEach((b) => {
+        selectionButtons.forEach((b) => {
             b.classList.remove("disabled");
             b.removeAttribute("disabled");
         });

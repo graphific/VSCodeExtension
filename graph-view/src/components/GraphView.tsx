@@ -267,8 +267,8 @@ export function GraphViewInProvider(props: GraphViewProps) {
     function alignSelectedNodes(
         alignment: "top" | "bottom" | "left" | "right",
     ) {
-        const selectedGraphNodes = graphContents.contentNodes.filter(
-            (n) => n.selected === true,
+        const selectedGraphNodes = graphContents.contentNodes.filter((n) =>
+            selectedNodes.includes(n.id),
         );
 
         const min = selectedGraphNodes.reduce(
@@ -503,16 +503,6 @@ export function GraphViewInProvider(props: GraphViewProps) {
                         color="var(--color-graph-bg-pattern)"
                         gap={40}
                     />
-                    <Panel position="bottom-left">
-                        <ButtonGroup direction="vertical">
-                            <FlowControls
-                                interactive={interactive}
-                                onInteractiveChanged={setInteractive}
-                                maxZoom={MaxZoom}
-                                minZoom={MinZoom}
-                            />
-                        </ButtonGroup>
-                    </Panel>
                     <MiniMap
                         pannable
                         draggable
@@ -560,6 +550,14 @@ export function GraphViewInProvider(props: GraphViewProps) {
                                 title="Auto Layout Horizontally"
                                 enabled={interactive}
                                 onClick={() => void autolayout("RIGHT")}
+                            />
+                        </ButtonGroup>
+                        <ButtonGroup direction="vertical">
+                            <FlowControls
+                                interactive={interactive}
+                                onInteractiveChanged={setInteractive}
+                                maxZoom={MaxZoom}
+                                minZoom={MinZoom}
                             />
                         </ButtonGroup>
                     </Panel>
