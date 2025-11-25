@@ -167,3 +167,4 @@ src/types/**/*.d.ts
 build/
 
 *.afdesign~lock~
+.env~

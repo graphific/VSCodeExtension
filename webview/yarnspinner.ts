@@ -170,6 +170,7 @@ const dynamicIconButtons: Array<{
 }> = [];
 
 let hideCommentsInPreview = false;
+let hideCommandsInPreview = false;
 let lastNodesEvent: NodesUpdatedEvent | null = null;
 
 function createIconElement(svgContent: string) {
@@ -272,8 +273,9 @@ viewState.onSelectionChanged = (nodes) => {
             nodesUpdated(event);
         } else if (event.type == "show-node") {
             showNode(event.node);
-        } else if (event.type == "set-hide-comments") {
+        } else if (event.type == "set-preview-options") {
             hideCommentsInPreview = event.hideComments;
+            hideCommandsInPreview = event.hideCommands;
             if (lastNodesEvent) {
                 nodesUpdated(lastNodesEvent);
             }
@@ -381,13 +383,22 @@ viewState.onSelectionChanged = (nodes) => {
     }
 
     function formatPreviewText(text: string): string {
-        if (!hideCommentsInPreview) {
-            return text;
+        let lines = text.split(/\r?\n/);
+        if (hideCommentsInPreview) {
+            lines = lines.filter(
+                (line) => line.trim().startsWith("//") === false,
+            );
         }
-
-        return text
-            .split(/\r?\n/)
-            .filter((line) => line.trim().startsWith("//") === false)
-            .join("\n");
+        if (hideCommandsInPreview) {
+            lines = lines
+                .map((line) =>
+                    line
+                        .replace(/\[[^\]]+\]/g, "")
+                        .replace(/\s+/g, " ")
+                        .trim(),
+                )
+                .filter((line) => line.length > 0);
+        }
+        return lines.join("\n");
     }
 })();

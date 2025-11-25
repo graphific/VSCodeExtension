@@ -305,6 +305,11 @@
                     "default": false,
                     "description": "Hide comment-only lines (beginning with //) in graph node previews"
                 },
+                "yarnspinner.graph.hideCommands": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Hide Yarn commands enclosed in square brackets (e.g. [wave]) in graph node previews"
+                },
                 "yarnspinner.enableExperimentalFeatures": {
                     "type": "boolean",
                     "default": false,

@@ -53,11 +53,13 @@ export class NodeView {
     private makeDraggable() {
         /** The current position of the drag, in client space. */
         let currentPosition: Position = { x: 0, y: 0 };
+        let dragMoved = false;
 
         const onNodeDragStart = (e: MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
             currentPosition = { x: e.clientX, y: e.clientY };
+            dragMoved = false;
 
             window.addEventListener("mousemove", onNodeDragMove);
             window.addEventListener("mouseup", onNodeDragEnd);
@@ -74,6 +76,7 @@ export class NodeView {
             this.onNodeDragMove(this, currentPosition, dragPosition);
 
             currentPosition = dragPosition;
+            dragMoved = true;
         };
 
         const onNodeDragEnd = (e: MouseEvent) => {
@@ -81,6 +84,16 @@ export class NodeView {
             window.removeEventListener("mouseup", onNodeDragEnd);
 
             this.onNodeDragEnd(this);
+
+            if (
+                dragMoved === false &&
+                !e.shiftKey &&
+                !e.altKey &&
+                !e.metaKey &&
+                !e.ctrlKey
+            ) {
+                this.onNodeEditClicked(this);
+            }
         };
 
         const onNodeDoubleClick = (e: MouseEvent) => {
@@ -108,12 +121,14 @@ export class NodeView {
             ".button-edit",
         ) as HTMLElement;
 
-        deleteButton.addEventListener("click", () =>
-            this.onNodeDeleteClicked(this),
-        );
-        editButton.addEventListener("click", () =>
-            this.onNodeEditClicked(this),
-        );
+        deleteButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            this.onNodeDeleteClicked(this);
+        });
+        editButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            this.onNodeEditClicked(this);
+        });
 
         const colorBar = newElement.querySelector(".color-bar") as HTMLElement;
 

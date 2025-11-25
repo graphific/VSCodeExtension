@@ -29,16 +29,17 @@ export interface ShowNodeEvent {
     node: string;
 }
 
-export interface HideCommentsEvent {
-    type: "set-hide-comments";
+export interface PreviewOptionsEvent {
+    type: "set-preview-options";
     hideComments: boolean;
+    hideCommands: boolean;
 }
 
 export type WebViewEvent =
     | NodesUpdatedEvent
     | StateUpdatedEvent
     | ShowNodeEvent
-    | HideCommentsEvent;
+    | PreviewOptionsEvent;
 
 export enum Commands {
     AddNode = "yarnspinner.create-node",
@@ -82,13 +83,16 @@ export class YarnSpinnerEditorProvider
             webviewPanel.webview,
         );
 
-        const sendHideCommentsSetting = () => {
+        const sendPreviewSettings = () => {
             const configs = vscode.workspace.getConfiguration("yarnspinner");
             const hideComments =
                 configs.get<boolean>("graph.hideComments") ?? false;
+            const hideCommands =
+                configs.get<boolean>("graph.hideCommands") ?? false;
             postWebviewMessage({
-                type: "set-hide-comments",
+                type: "set-preview-options",
                 hideComments,
+                hideCommands,
             });
         };
 
@@ -110,9 +114,12 @@ export class YarnSpinnerEditorProvider
         const onConfigChanged = vscode.workspace.onDidChangeConfiguration(
             (event) => {
                 if (
-                    event.affectsConfiguration("yarnspinner.graph.hideComments")
+                    event.affectsConfiguration(
+                        "yarnspinner.graph.hideComments",
+                    ) ||
+                    event.affectsConfiguration("yarnspinner.graph.hideCommands")
                 ) {
-                    sendHideCommentsSetting();
+                    sendPreviewSettings();
                 }
             },
         );
@@ -154,7 +161,7 @@ export class YarnSpinnerEditorProvider
             updateWebView(result);
         });
 
-        sendHideCommentsSetting();
+        sendPreviewSettings();
 
         function updateWebView(nodes: NodeInfo[]) {
             postWebviewMessage({
