@@ -71,6 +71,11 @@ If `speakerColors` is blank, the graph will automatically assign consistent
 colours to every speaker it sees (one colour per unique name). Disable this if
 you prefer completely uncoloured labels unless `speakerColors` is explicitly set.
 
+### Dialogue preview
+
+The dialogue preview panel reuses these settings, so inline formatting and
+speaker highlight colours match what you see in the graph view.
+
 ### Yarn choices
 
 Lines that begin with `->` are rendered as underlined choice rows with the arrow

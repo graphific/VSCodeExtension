@@ -152,6 +152,15 @@ export class YarnPreviewPanel {
             saveButton = "";
         }
 
+        const config = vscode.workspace.getConfiguration("yarnspinner");
+        const previewSettings = {
+            renderTextEffects:
+                config.get<boolean>("graph.renderTextEffects") ?? true,
+            speakerColors: config.get<string>("graph.speakerColors") ?? "",
+            autoSpeakerColors:
+                config.get<boolean>("graph.autoSpeakerColors") ?? true,
+        };
+
         let injectedYarnProgramScript = `
         <script>
         window.yarnData = {
@@ -159,6 +168,7 @@ export class YarnPreviewPanel {
             stringTable : ${JSON.stringify(yarnData.stringTable)},
             metadataTable : ${JSON.stringify(yarnData.metadata)}
         };
+        window.yarnPreviewSettings = ${JSON.stringify(previewSettings)};
         ${saveButton}
         </script>
         `;
@@ -168,6 +178,21 @@ export class YarnPreviewPanel {
         var html = contents.replace(
             replacementMarker,
             injectedYarnProgramScript,
+        );
+
+        const enhancerPath = vscode.Uri.joinPath(
+            extensionURI,
+            "media",
+            "previewEnhancements.js",
+        );
+        const previewEnhancements = fs.readFileSync(
+            enhancerPath.fsPath,
+            "utf-8",
+        );
+
+        html = html.replace(
+            "</body>",
+            `<script>${previewEnhancements}</script></body>`,
         );
 
         return html;
