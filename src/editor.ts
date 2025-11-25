@@ -33,6 +33,7 @@ export interface PreviewOptionsEvent {
     type: "set-preview-options";
     hideComments: boolean;
     hideCommands: boolean;
+    renderTextEffects: boolean;
 }
 
 export type WebViewEvent =
@@ -89,10 +90,13 @@ export class YarnSpinnerEditorProvider
                 configs.get<boolean>("graph.hideComments") ?? false;
             const hideCommands =
                 configs.get<boolean>("graph.hideCommands") ?? false;
+            const renderTextEffects =
+                configs.get<boolean>("graph.renderTextEffects") ?? true;
             postWebviewMessage({
                 type: "set-preview-options",
                 hideComments,
                 hideCommands,
+                renderTextEffects,
             });
         };
 
@@ -113,11 +117,15 @@ export class YarnSpinnerEditorProvider
 
         const onConfigChanged = vscode.workspace.onDidChangeConfiguration(
             (event) => {
+                const watchedSettings = [
+                    "yarnspinner.graph.hideComments",
+                    "yarnspinner.graph.hideCommands",
+                    "yarnspinner.graph.renderTextEffects",
+                ];
                 if (
-                    event.affectsConfiguration(
-                        "yarnspinner.graph.hideComments",
-                    ) ||
-                    event.affectsConfiguration("yarnspinner.graph.hideCommands")
+                    watchedSettings.some((setting) =>
+                        event.affectsConfiguration(setting),
+                    )
                 ) {
                     sendPreviewSettings();
                 }

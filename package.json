@@ -308,7 +308,12 @@
                 "yarnspinner.graph.hideCommands": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Hide Yarn commands enclosed in square brackets (e.g. [wave]) in graph node previews"
+                    "description": "Hide Yarn commands enclosed in square brackets (e.g. [wave]) and double angle brackets (e.g. <<jump>>) in graph node previews"
+                },
+                "yarnspinner.graph.renderTextEffects": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Render Yarn text effects (e.g. [wave], [bounce]) in graph node previews"
                 },
                 "yarnspinner.enableExperimentalFeatures": {
                     "type": "boolean",

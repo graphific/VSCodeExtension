@@ -171,6 +171,7 @@ const dynamicIconButtons: Array<{
 
 let hideCommentsInPreview = false;
 let hideCommandsInPreview = false;
+let renderTextEffectsInPreview = true;
 let lastNodesEvent: NodesUpdatedEvent | null = null;
 
 function createIconElement(svgContent: string) {
@@ -276,6 +277,7 @@ viewState.onSelectionChanged = (nodes) => {
         } else if (event.type == "set-preview-options") {
             hideCommentsInPreview = event.hideComments;
             hideCommandsInPreview = event.hideCommands;
+            renderTextEffectsInPreview = event.renderTextEffects;
             if (lastNodesEvent) {
                 nodesUpdated(lastNodesEvent);
             }
@@ -383,7 +385,10 @@ viewState.onSelectionChanged = (nodes) => {
     }
 
     function formatPreviewText(text: string): string {
-        let lines = text.split(/\r?\n/);
+        let processedText = renderTextEffectsInPreview
+            ? applyTextEffects(text)
+            : text;
+        let lines = processedText.split(/\r?\n/);
         if (hideCommentsInPreview) {
             lines = lines.filter(
                 (line) => line.trim().startsWith("//") === false,
@@ -394,11 +399,39 @@ viewState.onSelectionChanged = (nodes) => {
                 .map((line) =>
                     line
                         .replace(/\[[^\]]+\]/g, "")
+                        .replace(/<<[^>]+>>/g, "")
                         .replace(/\s+/g, " ")
                         .trim(),
                 )
                 .filter((line) => line.length > 0);
         }
         return lines.join("\n");
+    }
+
+    const textEffectDecorators: Record<
+        string,
+        { prefix: string; suffix: string }
+    > = {
+        wave: { prefix: "~", suffix: "~" },
+        bounce: { prefix: "^", suffix: "^" },
+        shake: { prefix: "!", suffix: "!" },
+        rainbow: { prefix: "*", suffix: "*" },
+        glitch: { prefix: "#", suffix: "#" },
+        bold: { prefix: "**", suffix: "**" },
+        italic: { prefix: "_", suffix: "_" },
+        underline: { prefix: "__", suffix: "__" },
+        color: { prefix: "", suffix: "" },
+    };
+
+    function applyTextEffects(input: string): string {
+        const regex = /\[(\w+)[^\]]*\]([\s\S]*?)\[\/\1\]/g;
+        return input.replace(regex, (_, tag: string, content: string) => {
+            const formattedInner = applyTextEffects(content);
+            const decorator = textEffectDecorators[tag.toLowerCase()] ?? {
+                prefix: "",
+                suffix: "",
+            };
+            return `${decorator.prefix}${formattedInner}${decorator.suffix}`;
+        });
     }
 })();
