@@ -10,6 +10,7 @@ import { NodeInfo } from "./nodes";
 import { getLinesSVGForNodes } from "./svg";
 import { arrayDiff } from "vscode-languageclient/lib/common/workspaceFolder";
 import { GroupType, GroupView } from "./GroupView";
+import ELK, { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk.bundled";
 
 export enum Alignment {
     Left = "LEFT",
@@ -51,6 +52,8 @@ export class ViewState {
     private zoomContainer: HTMLElement;
 
     private interactionEnabled = true;
+
+    private elk = new ELK();
 
     /** The number of nodes that have been created since the last time the
      * viewport was moved. */
@@ -913,35 +916,72 @@ export class ViewState {
         this.updateView();
     }
 
-    public autoLayout(direction: "horizontal" | "vertical") {
-        const targets =
-            this.selectedNodeViews.size > 1
-                ? Array.from(this.selectedNodeViews.values())
-                : Array.from(this.nodeViews.values());
-
-        if (targets.length === 0) {
+    public async autoLayout(direction: "horizontal" | "vertical") {
+        const nodeViews = Array.from(this.nodeViews.values());
+        if (nodeViews.length === 0) {
             return;
         }
 
-        const baseX = Math.min(...targets.map((n) => n.left));
-        const baseY = Math.min(...targets.map((n) => n.top));
-        const spacingX = constants.NodeSize.width + constants.newNodeOffset * 4;
-        const spacingY =
-            constants.NodeSize.height + constants.newNodeOffset * 4;
+        const layoutDirection = direction === "horizontal" ? "RIGHT" : "DOWN";
 
-        targets.forEach((nodeView, index) => {
-            if (direction === "horizontal") {
-                nodeView.left = baseX + index * spacingX;
-                nodeView.top = baseY;
-            } else {
-                nodeView.left = baseX;
-                nodeView.top = baseY + index * spacingY;
+        const elkChildren: ElkNode[] = nodeViews.map((nodeView) => ({
+            id: nodeView.nodeName,
+            width: nodeView.width || constants.NodeSize.width,
+            height: nodeView.height || constants.NodeSize.height,
+        }));
+        const nodeIds = new Set(elkChildren.map((c) => c.id));
+
+        const elkEdges: ElkExtendedEdge[] = [];
+        for (const nodeView of nodeViews) {
+            for (const connection of nodeView.outgoingConnections) {
+                if (connection.destinationType !== "Node") {
+                    continue;
+                }
+                const target = connection.nodeView.nodeName;
+                if (!nodeIds.has(target)) {
+                    continue;
+                }
+                elkEdges.push({
+                    id: `${nodeView.nodeName}->${target}-${elkEdges.length}`,
+                    sources: [nodeView.nodeName],
+                    targets: [target],
+                });
             }
-        });
+        }
 
-        this.refreshLines();
-        this.groupViews.forEach((group) => group.refreshSize());
-        this.emitNodePositions(targets);
+        const graph: ElkNode = {
+            id: "root",
+            layoutOptions: {
+                "elk.algorithm": "layered",
+                "elk.direction": layoutDirection,
+                "elk.layered.spacing.nodeNodeBetweenLayers": "100",
+                "elk.spacing.nodeNode": "80",
+            },
+            children: elkChildren,
+            edges: elkEdges,
+        };
+
+        try {
+            const result = await this.elk.layout(graph);
+            const children = result.children ?? [];
+            for (const child of children) {
+                if (!child.id) {
+                    continue;
+                }
+                const nodeView = this.nodeViews.get(child.id);
+                if (!nodeView) {
+                    continue;
+                }
+                nodeView.left = (child.x ?? 0) + constants.newNodeOffset;
+                nodeView.top = (child.y ?? 0) + constants.newNodeOffset;
+            }
+
+            this.refreshLines();
+            this.groupViews.forEach((group) => group.refreshSize());
+            this.emitNodePositions(nodeViews);
+        } catch (err) {
+            console.error("Auto layout failed", err);
+        }
     }
 
     private emitNodePositions(nodeViews: NodeView[]) {

@@ -112,13 +112,17 @@ const buttonConfigs: ButtonConfig[] = [
         id: "auto-layout-vertical",
         title: "Auto Layout Vertically",
         icon: require("./images/auto-layout-vertical.svg") as string,
-        onClick: () => viewState.autoLayout("vertical"),
+        onClick: () => {
+            void viewState.autoLayout("vertical");
+        },
     },
     {
         id: "auto-layout-horizontal",
         title: "Auto Layout Horizontally",
         icon: require("./images/auto-layout-horizontal.svg") as string,
-        onClick: () => viewState.autoLayout("horizontal"),
+        onClick: () => {
+            void viewState.autoLayout("horizontal");
+        },
     },
     {
         id: "zoom-in",
