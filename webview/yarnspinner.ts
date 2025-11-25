@@ -1,4 +1,5 @@
 import { NodesUpdatedEvent } from "../src/types/editor";
+import { NodeInfo } from "./nodes";
 
 import { Alignment, ViewState } from "./ViewState";
 import { NodeView } from "./NodeView";
@@ -168,6 +169,9 @@ const dynamicIconButtons: Array<{
     iconProvider: () => string;
 }> = [];
 
+let hideCommentsInPreview = false;
+let lastNodesEvent: NodesUpdatedEvent | null = null;
+
 function createIconElement(svgContent: string) {
     const element = parser.parseFromString(svgContent, "image/svg+xml")
         .firstElementChild as SVGElement;
@@ -264,9 +268,15 @@ viewState.onSelectionChanged = (nodes) => {
         const event = e.data as WebViewEvent;
 
         if (event.type == "update") {
+            lastNodesEvent = event;
             nodesUpdated(event);
         } else if (event.type == "show-node") {
             showNode(event.node);
+        } else if (event.type == "set-hide-comments") {
+            hideCommentsInPreview = event.hideComments;
+            if (lastNodesEvent) {
+                nodesUpdated(lastNodesEvent);
+            }
         }
     });
 
@@ -335,25 +345,49 @@ viewState.onSelectionChanged = (nodes) => {
      */
     function nodesUpdated(data: NodesUpdatedEvent) {
         let nodesWithDefaultPosition = 0;
+        const processedNodes = data.nodes.map((nodeInfo) => {
+            const copy: NodeInfo = {
+                ...nodeInfo,
+                headers: nodeInfo.headers.map((h) => ({ ...h })),
+                jumps: nodeInfo.jumps.map((j) => ({ ...j })),
+                previewText: formatPreviewText(nodeInfo.previewText),
+            };
 
-        for (let nodeInfo of data.nodes) {
-            let position = getPositionFromNodeInfo(nodeInfo);
+            let position = getPositionFromNodeInfo(copy);
 
             if (!position) {
-                const position = {
+                const newPosition = {
                     x: newNodeOffset * nodesWithDefaultPosition,
                     y: newNodeOffset * nodesWithDefaultPosition,
                 };
-                nodeInfo.headers.push({
+                copy.headers.push({
                     key: "position",
-                    value: `${position.x},${position.y}`,
+                    value: `${newPosition.x},${newPosition.y}`,
                 });
                 nodesWithDefaultPosition += 1;
             }
+
+            return copy;
+        });
+
+        const processedEvent: NodesUpdatedEvent = {
+            ...data,
+            nodes: processedNodes,
+        };
+
+        viewState.nodes = processedNodes;
+
+        updateDropdownList(processedEvent);
+    }
+
+    function formatPreviewText(text: string): string {
+        if (!hideCommentsInPreview) {
+            return text;
         }
 
-        viewState.nodes = data.nodes;
-
-        updateDropdownList(data);
+        return text
+            .split(/\r?\n/)
+            .filter((line) => line.trim().startsWith("//") === false)
+            .join("\n");
     }
 })();

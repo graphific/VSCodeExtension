@@ -14,6 +14,7 @@ type OutgoingConnection = {
 
 export class NodeView {
     nodeName: string = "";
+    sourceTitle?: string;
     element: HTMLElement;
 
     /** The names of the tagged groups that this node view is in. */
@@ -126,6 +127,7 @@ export class NodeView {
 
     public set nodeInfo(node: NodeInfo) {
         this.nodeName = node.uniqueTitle ?? "(Error: no title)";
+        this.sourceTitle = node.sourceTitle ?? node.uniqueTitle ?? undefined;
         this.position = getPositionFromNodeInfo(node) ?? { x: 0, y: 0 };
 
         const isInNodeGroup = node.sourceTitle != node.uniqueTitle;

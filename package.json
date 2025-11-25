@@ -300,6 +300,11 @@
                     "default": true,
                     "description": "Should the vertices of the graph be clustered based on file or not"
                 },
+                "yarnspinner.graph.hideComments": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Hide comment-only lines (beginning with //) in graph node previews"
+                },
                 "yarnspinner.enableExperimentalFeatures": {
                     "type": "boolean",
                     "default": false,

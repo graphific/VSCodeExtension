@@ -987,7 +987,8 @@ export class ViewState {
     private emitNodePositions(nodeViews: NodeView[]) {
         const positions: Record<string, Position> = {};
         nodeViews.forEach((nv) => {
-            positions[nv.nodeName] = nv.position;
+            const identifier = nv.sourceTitle ?? nv.nodeName;
+            positions[identifier] = nv.position;
         });
         this.onNodesMoved(positions);
     }

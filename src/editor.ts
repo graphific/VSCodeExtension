@@ -29,10 +29,16 @@ export interface ShowNodeEvent {
     node: string;
 }
 
+export interface HideCommentsEvent {
+    type: "set-hide-comments";
+    hideComments: boolean;
+}
+
 export type WebViewEvent =
     | NodesUpdatedEvent
     | StateUpdatedEvent
-    | ShowNodeEvent;
+    | ShowNodeEvent
+    | HideCommentsEvent;
 
 export enum Commands {
     AddNode = "yarnspinner.create-node",
@@ -76,6 +82,16 @@ export class YarnSpinnerEditorProvider
             webviewPanel.webview,
         );
 
+        const sendHideCommentsSetting = () => {
+            const configs = vscode.workspace.getConfiguration("yarnspinner");
+            const hideComments =
+                configs.get<boolean>("graph.hideComments") ?? false;
+            postWebviewMessage({
+                type: "set-hide-comments",
+                hideComments,
+            });
+        };
+
         const onNodesChangedSubscription = this.onDidChangeNodes((params) => {
             let uri = vscode.Uri.parse(params.uri);
             if (uri.fsPath == document.uri.fsPath) {
@@ -91,9 +107,20 @@ export class YarnSpinnerEditorProvider
                 }
             });
 
+        const onConfigChanged = vscode.workspace.onDidChangeConfiguration(
+            (event) => {
+                if (
+                    event.affectsConfiguration("yarnspinner.graph.hideComments")
+                ) {
+                    sendHideCommentsSetting();
+                }
+            },
+        );
+
         webviewPanel.onDidDispose(() => {
             onNodesChangedSubscription.dispose();
             onRequestedNodeInGraphViewSubscription.dispose();
+            onConfigChanged.dispose();
         });
 
         // Receive message from the webview.
@@ -126,6 +153,8 @@ export class YarnSpinnerEditorProvider
         ).then((result) => {
             updateWebView(result);
         });
+
+        sendHideCommentsSetting();
 
         function updateWebView(nodes: NodeInfo[]) {
             postWebviewMessage({
