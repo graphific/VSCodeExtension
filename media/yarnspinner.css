@@ -32,6 +32,10 @@ body {
     );
 }
 
+body.webview-fullscreen {
+    background: var(--vscode-editor-background);
+}
+
 div.nodes {
     position: absolute;
     width: 100vw;

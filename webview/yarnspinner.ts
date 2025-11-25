@@ -150,6 +150,11 @@ const lockIcons = {
     unlocked: require("./images/unlock.svg") as string,
 };
 
+const fullscreenIcons = {
+    enter: require("./images/fullscreen-enter.svg") as string,
+    exit: require("./images/fullscreen-exit.svg") as string,
+};
+
 buttonConfigs.push({
     id: "toggle-interactive",
     title: "Toggle Interaction",
@@ -158,6 +163,16 @@ buttonConfigs.push({
     onClick: () => {
         viewState.setInteractionEnabled(!viewState.isInteractionEnabled);
         updateDynamicIcons();
+    },
+});
+
+buttonConfigs.push({
+    id: "toggle-fullscreen",
+    title: "Toggle Fullscreen",
+    icon: () =>
+        isFullscreenActive() ? fullscreenIcons.exit : fullscreenIcons.enter,
+    onClick: () => {
+        toggleFullscreen();
     },
 });
 
@@ -193,6 +208,45 @@ function applySpeakerColors(raw: string) {
     explicitSpeakerColors = parseSpeakerColors(raw);
     autoSpeakerColors = {};
 }
+
+let pseudoFullscreen = false;
+
+function toggleFullscreen() {
+    if (document.fullscreenEnabled) {
+        if (!document.fullscreenElement) {
+            document.documentElement
+                .requestFullscreen?.()
+                .then(() => updateDynamicIcons())
+                .catch(() => togglePseudoFullscreen());
+            return;
+        } else {
+            document
+                .exitFullscreen?.()
+                .then(() => updateDynamicIcons())
+                .catch(() => togglePseudoFullscreen());
+            return;
+        }
+    }
+    togglePseudoFullscreen();
+}
+
+function togglePseudoFullscreen() {
+    pseudoFullscreen = !pseudoFullscreen;
+    document.body.classList.toggle("webview-fullscreen", pseudoFullscreen);
+    updateDynamicIcons();
+}
+
+function isFullscreenActive(): boolean {
+    return Boolean(document.fullscreenElement) || pseudoFullscreen;
+}
+
+document.addEventListener("fullscreenchange", () => {
+    if (document.fullscreenElement === null && pseudoFullscreen) {
+        document.body.classList.remove("webview-fullscreen");
+        pseudoFullscreen = false;
+    }
+    updateDynamicIcons();
+});
 
 function ensureAutoSpeakerColor(name: string) {
     const key = name.toLowerCase();
