@@ -187,6 +187,8 @@ export class ViewState {
 
         // The client-space position where we started dragging from.
         let dragStartPosition: Position = { x: 0, y: 0 };
+        let additiveSelection = false;
+        let priorSelection: Set<NodeView> = new Set();
 
         const dragBegin = (e: MouseEvent) => {
             if (!this.interactionEnabled) {
@@ -197,19 +199,23 @@ export class ViewState {
                 return;
             }
 
+            additiveSelection = e.shiftKey;
+            priorSelection = new Set(this.selectedNodeViews);
+
             // Make the box visible by adding it to the DOM.
             zoomContainer.appendChild(boxElement);
 
             // Record where we started dragging from.
             dragStartPosition = { x: e.clientX, y: e.clientY };
 
-            // Clear the node selection immediately.
-            for (const selectedNode of this.selectedNodeViews) {
-                selectedNode.element.classList.remove("selected");
+            if (!additiveSelection) {
+                // Clear the node selection immediately when not additive.
+                for (const selectedNode of this.selectedNodeViews) {
+                    selectedNode.element.classList.remove("selected");
+                }
+                this.selectedNodeViews.clear();
+                this.onSelectionChanged([]);
             }
-            this.selectedNodeViews.clear();
-
-            this.onSelectionChanged([]);
 
             boxElement.style.left = `${dragStartPosition.x}px`;
             boxElement.style.top = `${dragStartPosition.y}px`;
@@ -268,23 +274,31 @@ export class ViewState {
                 );
             };
 
-            this.selectedNodeViews.clear();
+            const nodesToSelect = new Set<NodeView>(
+                additiveSelection ? priorSelection : [],
+            );
 
             for (const entry of this.nodeViews) {
                 const nodeView = entry[1];
-                if (nodeView) {
-                    if (
-                        intersects(
-                            nodeView.element.getBoundingClientRect(),
-                            selectionRect,
-                        )
-                    ) {
-                        this.selectedNodeViews.add(nodeView);
-                        nodeView.element.classList.add("selected");
-                    } else {
-                        nodeView.element.classList.remove("selected");
-                    }
+                if (!nodeView) {
+                    continue;
                 }
+                if (
+                    intersects(
+                        nodeView.element.getBoundingClientRect(),
+                        selectionRect,
+                    )
+                ) {
+                    nodesToSelect.add(nodeView);
+                    nodeView.element.classList.add("selected");
+                } else if (!nodesToSelect.has(nodeView)) {
+                    nodeView.element.classList.remove("selected");
+                }
+            }
+
+            this.selectedNodeViews.clear();
+            for (const node of nodesToSelect) {
+                this.selectedNodeViews.add(node);
             }
             this.onSelectionChanged(this.selectedNodes);
         };
